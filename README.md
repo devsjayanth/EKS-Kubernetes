@@ -1,108 +1,144 @@
-# EKS Cluster Setup:
+# EKS Cluster Setup: mycluster
 
-Instructions and configurations to deploy an Amazon EKS cluster in the `ap-south-1` region.
+Instructions to deploy an Amazon EKS cluster in the `ap-south-1` region.
 
 ## Prerequisites
 - AWS CLI configured
 - eksctl installed
 - kubectl installed
 
+---
+
 ## Method 1: Using Shell Commands
 
 Run the following commands sequentially to create and configure the cluster.
 
 ```bash
-
-# ==========================================
-#  Create EKS Cluster
-# ==========================================
-eksctl create cluster --name=dev-cluster-01 \
+# 1. Create Cluster Control Plane
+eksctl create cluster --name=mycluster \
                       --region=ap-south-1 \
                       --zones=ap-south-1a,ap-south-1b \
+                      --version=1.36 \
                       --without-nodegroup
-                  
+
+# 2. Associate IAM OIDC Provider
 eksctl utils associate-iam-oidc-provider \
-    --region ap-south-1 \
-    --cluster dev-cluster-01 \
+    --region=ap-south-1 \
+    --cluster=mycluster \
     --approve
-   
-eksctl create nodegroup --cluster=dev-cluster-01 \
+
+# 3. Create Managed Node Group
+eksctl create nodegroup --cluster=mycluster \
                         --region=ap-south-1 \
-                        --name=dev-cluster-01-ng-private \
+                        --name=mycluster-ng-private \
                         --node-type=t3.medium \
                         --nodes-min=2 \
                         --nodes-max=3 \
                         --node-volume-size=20 \
                         --managed \
+                        --node-private-networking \
                         --asg-access \
                         --external-dns-access \
                         --full-ecr-access \
                         --appmesh-access \
-                        --alb-ingress-access \
-                        --node-private-networking
-# ==========================================
-# Update kubeconfig file
-# ==========================================
-aws eks update-kubeconfig --name dev-cluster-01 --region ap-south-1
+                        --alb-ingress-access
 
-# ==========================================
-# Update EKS Cluster Components
-# ==========================================
-
-# 1. Update Control Plane (Specify target version, e.g., 1.36)
-eksctl upgrade cluster --name=dev-cluster-01 \
-                       --version=1.36 \
-                       --approve
-# ==========================================
-# 2. Update Node Group (Upgrades nodes to match control plane version)
-# ==========================================
-eksctl upgrade nodegroup --cluster=dev-cluster-01 \
-                         --name=dev-cluster-01-ng-private
-# ==========================================
-# 3. Update Compute (Scale node group capacity)
-# ==========================================
-eksctl scale nodegroup --cluster=dev-cluster-01 \
-                       --name=dev-cluster-01-ng-private \
-                       --nodes=3 \
-                       --nodes-min=2 \
-                       --nodes-max=5
-# ==========================================
-# 4. Update EKS Add-ons (e.g., vpc-cni, coredns, kube-proxy)
-# ==========================================
-eksctl update addon --cluster=dev-cluster-01 --name=vpc-cni
-eksctl update addon --cluster=dev-cluster-01 --name=coredns
-eksctl update addon --cluster=dev-cluster-01 --name=kube-proxy
-
-# ==========================================
-# Delete the EKS Cluster
-# ==========================================
-eksctl delete cluster --name dev-cluster-01 --region ap-south-1
-
+# 4. Update kubeconfig
+aws eks update-kubeconfig --name=mycluster --region=ap-south-1
 ```
+
+---
 
 ## Method 2: Using eksctl YAML Configuration
 
-Use the declarative `dev-cluster01.yml.yml` file provided in this repository.
+Use the declarative `mycluster-eks.yml` file. This is the recommended approach for version control.
 
 ```bash
-# Create cluster using the YAML file
-eksctl create cluster -f dev-cluster01.yml
+# 1. Create the cluster using the YAML configuration file
+eksctl create cluster -f mycluster-eks.yml
+
+# 2. Update your local kubeconfig
+aws eks update-kubeconfig --name=mycluster --region=ap-south-1
 ```
 
-## Cluster Operations
+---
 
-### Update Control Plane and Node Groups
+## Update Control Plane
+
+Upgrade the EKS control plane to a specific Kubernetes version.
+
+```bash
+eksctl upgrade cluster --name=mycluster \
+                       --region=ap-south-1 \
+                       --version=1.36 \
+                       --approve
+```
+
+## Upgrade Node Group
+
+Upgrade the managed node group to match the control plane version.
+
+```bash
+eksctl upgrade nodegroup --cluster=mycluster \
+                         --region=ap-south-1 \
+                         --name=mycluster-ng-private
+```
+
+## Scale Compute
+
+Adjust the desired, minimum, and maximum capacity of the node group.
+
+```bash
+eksctl scale nodegroup --cluster=mycluster \
+                       --region=ap-south-1 \
+                       --name=mycluster-ng-private \
+                       --nodes=3 \
+                       --nodes-min=2 \
+                       --nodes-max=5
+```
+
+## Update Add-ons
+
+Update the core EKS add-ons to their latest compatible versions.
+
+```bash
+eksctl update addon --cluster=mycluster --region=ap-south-1 --name=vpc-cni --version=latest
+eksctl update addon --cluster=mycluster --region=ap-south-1 --name=coredns --version=latest
+eksctl update addon --cluster=mycluster --region=ap-south-1 --name=kube-proxy --version=latest
+```
+
+## Verify Cluster
+
+Check the status of the nodes and cluster components.
+
+```bash
+kubectl get nodes
+kubectl get pods -n kube-system
+```
+
+## Cleanup
+
+Delete the cluster and all associated resources.
+
+```bash
+# If created via Shell
+eksctl delete cluster --name=mycluster --region=ap-south-1
+
+# If created via YAML
+eksctl delete cluster -f mycluster-eks.yml
+```
+```
 
 ***
 
-# dev-cluster01.yml.yml
+# mycluster-eks.yml
 
 ```yaml
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 
 metadata:
-  name: dev-cluster-01
+  name: mycluster
   region: ap-south-1
   version: "1.36"
 
@@ -114,7 +150,7 @@ iam:
   withOIDC: true
 
 managedNodeGroups:
-  - name: dev-cluster-01-ng-private
+  - name: mycluster-ng-private
     instanceType: t3.medium
     desiredCapacity: 2
     minSize: 2

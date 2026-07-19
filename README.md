@@ -1,4 +1,4 @@
-# EKS Cluster Setup: mycluster
+# EKS Cluster Setup
 
 Instructions to deploy an Amazon EKS cluster in the `ap-south-1` region.
 
@@ -126,60 +126,4 @@ eksctl delete cluster --name=mycluster --region=ap-south-1
 
 # If created via YAML
 eksctl delete cluster -f mycluster-eks.yml
-```
-```
-
-***
-
-# mycluster-eks.yml
-
-```yaml
-apiVersion: eksctl.io/v1alpha5
-kind: ClusterConfig
-
-metadata:
-  name: mycluster
-  region: ap-south-1
-  version: "1.36"
-
-availabilityZones:
-  - ap-south-1a
-  - ap-south-1b
-
-iam:
-  withOIDC: true
-
-managedNodeGroups:
-  - name: mycluster-ng-private
-    instanceType: t3.medium
-    desiredCapacity: 2
-    minSize: 2
-    maxSize: 5
-    volumeSize: 20
-    privateNetworking: true
-    iam:
-      withAddonPolicies:
-        autoScaler: true
-        externalDNS: true
-        imageBuilder: true
-        appMesh: true
-        albIngress: true
-        cloudWatch: true
-
-addons:
-  - name: vpc-cni
-    version: latest
-  - name: coredns
-    version: latest
-  - name: kube-proxy
-    version: latest
-
-cloudWatch:
-  clusterLogging:
-    enableTypes:
-      - api
-      - audit
-      - authenticator
-      - controllerManager
-      - scheduler
 ```

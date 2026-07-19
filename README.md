@@ -249,7 +249,7 @@ output "cluster_name" {
 ```
 ---
 
-### Terraform configuration
+## Method 3: Terraform configuration
 
 1. Initialize Terraform and download the required modules:
 ```bash
